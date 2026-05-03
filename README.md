@@ -1,6 +1,3 @@
-# obsidian-css-snippets
-# Obsidian CSS Snippets
-
 # Obsidian CSS 样式合集
 
 一套专为 Obsidian 打造的界面优化 CSS 片段，解决表格排版、图片展示、长内容滚动等常见体验问题，让笔记阅读与编辑更舒适。
