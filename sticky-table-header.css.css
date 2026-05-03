@@ -1,0 +1,53 @@
+/* 1. 容器修正：避免 sticky 被裁剪
+   - sticky 表头会“脱离正常滚动内容的遮挡层级”，如果上层容器 overflow:hidden/auto 叠加不当，
+     可能导致表头显示不全或直接被裁剪。
+   - 这里用 overflow:visible 做兜底（代价：某些布局的滚动裁剪行为会改变）。 */
+.markdown-rendered div:has(> table),
+.el-table,
+.markdown-preview-sizer,
+.markdown-preview-section {
+    overflow: visible !important;
+    contain: none !important;
+}
+
+/* 说明：表头吸顶的关键是 position:sticky + 合法的 top（必须是单个长度值）。
+   - 如果 top 的 calc/var 结果非法（例如 var 引用到多值变量），浏览器会当成 top:auto，
+     sticky 就会完全失效（表现为“没有固定效果”）。
+   - 因此这里采用“可手动调参”的变量方式，优先保证稳定生效。 */
+:root {
+    /* 吸顶基准偏移：用来抵消主题/布局造成的顶部留白。
+       你当前环境实测 -33px 观感最佳；不同主题可在此处微调。 */
+    --obs-table-sticky-top: -33px;
+    /* 额外偏移：用于临时叠加，不建议长期依赖（优先调整 --obs-table-sticky-top）。 */
+    --obs-table-sticky-extra-top: 0px;
+    /* 1px 缝隙修复：当表头顶部出现细缝时可设为 1px；正常为 0px。 */
+    --obs-table-sticky-gap-fix: 0px;
+    /* 避免被内容盖住：必要时可调大（例如 2000）。 */
+    --obs-table-sticky-z: 999;
+}
+
+/* 2. 表格结构兼容
+   - .el-table：部分表格插件/导入内容会用该结构渲染。
+   - border-collapse 有助于让 sticky 表头边框贴合，减少“缝隙感”。 */
+.el-table table {
+    border-collapse: collapse !important;
+}
+
+/* 3. 表头吸顶（通用规则）
+   覆盖面：
+   - 普通 Markdown 表格：thead th/td
+   - 无 thead 的表格：第一行 th
+   - .el-table：thead th
+   注意：
+   - background-color 必须不透明，否则滚动时表头会透出下方内容。 */
+.markdown-rendered table thead tr th,
+.markdown-rendered table thead tr td,
+.markdown-rendered table tr:first-child > th,
+.el-table thead tr th {
+    position: sticky !important;
+    top: calc(var(--obs-table-sticky-top, 0px) + var(--obs-table-sticky-extra-top, 0px) - var(--obs-table-sticky-gap-fix, 1px)) !important;
+    z-index: var(--obs-table-sticky-z, 999) !important;
+    background-color: var(--background-primary) !important;
+    background-clip: padding-box;
+    border-bottom: 1px solid var(--background-modifier-border) !important;
+}

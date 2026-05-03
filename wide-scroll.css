@@ -1,0 +1,41 @@
+/* 1. 允许内容区产生横向滚动条，但不再强制文字行不换行 */
+.markdown-source-view.mod-cm6 .cm-scroller,
+.markdown-rendered {
+    overflow-x: auto !important;
+}
+
+/* 2. 【关键修改】仅锁定大元素的宽度，让它们撑开滚动条 */
+/* 移除之前对 .cm-line 的 min-width 限制 */
+.markdown-rendered table,
+.markdown-source-view.mod-cm6 table,
+.markdown-rendered pre,
+.markdown-source-view.mod-cm6 pre,
+.markdown-rendered img {
+    min-width: max-content !important; /* 只有这些元素会强行横向撑开 */
+    max-width: none !important;
+    display: table !important; /* 确保表格和代码块作为独立块撑起宽度 */
+}
+
+/* 3. 针对编辑器的特殊处理：确保表格容器不被父级压缩 */
+.cm-table-widget, .cm-embed-block {
+    display: block !important;
+    width: max-content !important;
+}
+
+/* 4. 视觉对齐：滚动条样式（保留你的原样） */
+::-webkit-scrollbar {
+    height: 10px !important;
+    width: 10px !important;
+    display: block !important;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb-bg) !important;
+    border-radius: var(--scrollbar-radius) !important;
+    border: 2px solid transparent !important;
+    background-clip: content-box !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-active-thumb-bg) !important;
+}

@@ -1,0 +1,285 @@
+/* 1. 全局图片样式限制（含编辑与阅读模式）
+   - 覆盖范围：编辑模式（cm6）与阅读/预览渲染（.markdown-rendered）。
+   - 目的：对“正文图片”做统一最大宽高限制，避免图片过大影响排版。
+   - 风险：该规则会命中所有 .markdown-rendered img（包含 emoji、图标等）。如发现表情/图标被强制换行或增加 margin，建议将选择器改为排除 .emoji。 */
+.markdown-source-view.mod-cm6 .cm-content img, /* 编辑模式图片 */
+.markdown-source-view.mod-cm6 .cm-line img,    /* 编辑模式行内图片 */
+.markdown-rendered img {                      /* 阅读模式图片 */
+  max-width: 75% !important;
+  max-height: 700px !important;
+  height: auto !important;
+  object-fit: contain;
+  display: block;
+  margin: 8px 0;
+  border-radius: 4px;
+}
+
+/* 2. 表格内图片：强制缩略（优先级更高）
+   - 目的：避免表格被图片撑开，强制缩略到 120×120 容器内。
+   - 适用：编辑模式与阅读/预览渲染都覆盖。
+   - 说明：这里用 display:inline-block + max-width/max-height 来约束尺寸，保持比例。 */
+.markdown-source-view.mod-cm6 .cm-content table img,
+.markdown-rendered table img {
+  max-width: 120px !important;  /* 稍微放宽到120px，80px有时太小看不清 */
+  max-height: 120px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  margin: 2px auto !important;
+  display: inline-block !important; /* 表格内建议用 inline-block，防止撑破行高 */
+  vertical-align: middle;
+}
+
+/* 编辑模式（cm6）里禁止表格图片的 hover 位移/变形：避免编辑时闪动或撑开布局 */
+.markdown-source-view.mod-cm6 .cm-content table img:hover {
+  position: static !important;
+  transform: none !important;
+}
+
+/* 3. 悬浮预览交互（仅桌面端）
+   - 触发条件：支持 hover 的指针设备（桌面鼠标/触控板）。
+   - 核心机制：
+     1) hover 时用 ::before 生成全屏遮罩（fixed + 高 z-index，pointer-events:none）。
+     2) 将目标 img 设为 position:fixed 并移动到视口中心（top/left 50% + translate）。
+     3) 通过 min-width/min-height “占位热区”降低闪烁（重要权衡：占位越大越不闪，但越慢退出）。 */
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --obs-img-preview-max-w: min(80vw, 80%);
+    --obs-img-preview-max-h: 80vh;
+    /* 以下变量在“背景板版本”会使用（padding/圆角/阴影）。
+       当前版本已取消背景板，这些变量保留仅用于未来快速恢复样式。 */
+    --obs-img-preview-padding: 8px;
+    --obs-img-preview-radius: 10px;
+    --obs-img-preview-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+    --obs-img-overlay-blur: 2px;
+    --obs-img-overlay-a0: 0.18;
+    --obs-img-overlay-a1: 0.28;
+    --obs-img-overlay-a2: 0.48;
+    /* embed 规则的占位热区：不接受“闪”时应调大；接受“更快退出”时可调小 */
+    --obs-nontable-preview-placeholder-h: min(700px, 80vh);
+    --obs-nontable-preview-placeholder-w: min(75vw, 100%);
+    /* loose 规则（:has(> img)）的占位热区：通常比 embed 更容易闪，这里可单独调参 */
+    --obs-loose-preview-placeholder-h: min(700px, 80vh);
+    --obs-loose-preview-placeholder-w: min(75vw, 100%);
+  }
+
+  @keyframes obs-table-img-overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes obs-table-img-preview-in {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+    60% { opacity: 1; transform: translate(-50%, -50%) scale(1.01); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  /* 3.1 非表格：embed 类图片（适配更广）
+     - 典型结构：.image-embed / .internal-embed / .external-embed / .media-embed 包裹图片。
+     - 这里额外支持 .internal-embed/.external-embed 只要内部有 img 就匹配（:has）。
+     - 注意：排除 table 内部，表格走 3.3 规则。 */
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :is(.internal-embed.image-embed, .external-embed.image-embed, .image-embed, .media-embed, .internal-embed:has(img:not(.emoji)), .external-embed:has(img:not(.emoji))):not(:where(table *)) {
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    vertical-align: middle;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :is(.internal-embed.image-embed, .external-embed.image-embed, .image-embed, .media-embed, .internal-embed:has(img:not(.emoji)), .external-embed:has(img:not(.emoji))):not(:where(table *)) img:not(.emoji) {
+    cursor: zoom-in;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :is(.internal-embed.image-embed, .external-embed.image-embed, .image-embed, .media-embed, .internal-embed:has(img:not(.emoji)), .external-embed:has(img:not(.emoji))):not(:where(table *)):hover {
+    min-width: var(--obs-nontable-preview-placeholder-w);
+    min-height: var(--obs-nontable-preview-placeholder-h);
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :is(.internal-embed.image-embed, .external-embed.image-embed, .image-embed, .media-embed, .internal-embed:has(img:not(.emoji)), .external-embed:has(img:not(.emoji))):not(:where(table *)):hover::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    background:
+      radial-gradient(circle at center,
+        rgba(0, 0, 0, var(--obs-img-overlay-a0)) 0%,
+        rgba(0, 0, 0, var(--obs-img-overlay-a1)) 55%,
+        rgba(0, 0, 0, var(--obs-img-overlay-a2)) 100%);
+    backdrop-filter: blur(var(--obs-img-overlay-blur));
+    -webkit-backdrop-filter: blur(var(--obs-img-overlay-blur));
+    pointer-events: none;
+    animation: obs-table-img-overlay-in 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :is(.internal-embed.image-embed, .external-embed.image-embed, .image-embed, .media-embed, .internal-embed:has(img:not(.emoji)), .external-embed:has(img:not(.emoji))):not(:where(table *)):hover img:not(.emoji) {
+    position: fixed !important;
+    top: 50%;
+    left: 50%;
+    z-index: 99999;
+    max-width: var(--obs-img-preview-max-w) !important;
+    max-height: var(--obs-img-preview-max-h) !important;
+    width: var(--obs-img-preview-max-w) !important;
+    height: auto !important;
+    margin: 0 !important;
+    display: block !important;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+    animation: obs-table-img-preview-in 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  /* 3.2 非表格：loose 类图片（容器直接子元素只有 img/br）
+     - 用途：兼容某些“导入 HTML/特殊渲染”的图片结构，避免完全没预览。
+     - 限制：只适配“容器内只有 img + 可选 br”的情况，防止误伤包含大量文字的块级容器。
+     - 与 3.1 区别：占位热区使用 --obs-loose-preview-placeholder-*，可独立调参。 */
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :has(> img:not(.emoji)):not(:has(> :not(img, br))):not(:where(table *)) {
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    vertical-align: middle;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :has(> img:not(.emoji)):not(:has(> :not(img, br))):not(:where(table *)) > img:not(.emoji) {
+    cursor: zoom-in;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :has(> img:not(.emoji)):not(:has(> :not(img, br))):not(:where(table *)):hover {
+    min-width: var(--obs-loose-preview-placeholder-w);
+    min-height: var(--obs-loose-preview-placeholder-h);
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :has(> img:not(.emoji)):not(:has(> :not(img, br))):not(:where(table *)):hover::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    background:
+      radial-gradient(circle at center,
+        rgba(0, 0, 0, var(--obs-img-overlay-a0)) 0%,
+        rgba(0, 0, 0, var(--obs-img-overlay-a1)) 55%,
+        rgba(0, 0, 0, var(--obs-img-overlay-a2)) 100%);
+    backdrop-filter: blur(var(--obs-img-overlay-blur));
+    -webkit-backdrop-filter: blur(var(--obs-img-overlay-blur));
+    pointer-events: none;
+    animation: obs-table-img-overlay-in 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered :has(> img:not(.emoji)):not(:has(> :not(img, br))):not(:where(table *)):hover > img:not(.emoji) {
+    position: fixed !important;
+    top: 50%;
+    left: 50%;
+    z-index: 99999;
+    max-width: var(--obs-img-preview-max-w) !important;
+    max-height: var(--obs-img-preview-max-h) !important;
+    width: var(--obs-img-preview-max-w) !important;
+    height: auto !important;
+    margin: 0 !important;
+    display: block !important;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+    animation: obs-table-img-preview-in 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  /* 3.3 表格：单元格缩略 + hover 居中预览
+     - 表格内图片先被 2) 强制缩略；此处再提供 hover 时的居中预览。
+     - 注意：这里用“父容器 hover -> 作用于子 img”的方式降低闪烁；不要对 table img 写全局 img:hover 兜底。 */
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) {
+    position: relative;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) :is(span, a, div, p, figure):has(> img:not(.emoji)) {
+    display: inline-flex;
+    width: 120px;
+    height: 120px;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px transparent;
+    transition: box-shadow 220ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) :is(span, a, div, p, figure):has(> img:not(.emoji)) > img:not(.emoji) {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+    object-position: center !important;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) img:not(.emoji),
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) img:not(.emoji) {
+    cursor: zoom-in;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) :is(span, a, div, p, figure):has(> img:not(.emoji)):hover {
+    box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) :is(span, a, div, p, figure):has(> img:not(.emoji)):hover::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    background:
+      radial-gradient(circle at center,
+        rgba(0, 0, 0, var(--obs-img-overlay-a0)) 0%,
+        rgba(0, 0, 0, var(--obs-img-overlay-a1)) 55%,
+        rgba(0, 0, 0, var(--obs-img-overlay-a2)) 100%);
+    backdrop-filter: blur(var(--obs-img-overlay-blur));
+    -webkit-backdrop-filter: blur(var(--obs-img-overlay-blur));
+    pointer-events: none;
+    animation: obs-table-img-overlay-in 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) :is(span, a, div, p, figure):has(> img:not(.emoji)):hover > img:not(.emoji) {
+    position: fixed !important;
+    top: 50%;
+    left: 50%;
+    z-index: 99999;
+    max-width: var(--obs-img-preview-max-w) !important;
+    max-height: var(--obs-img-preview-max-h) !important;
+    width: var(--obs-img-preview-max-w) !important;
+    height: auto !important;
+    margin: 0 !important;
+    display: block !important;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+    animation: obs-table-img-preview-in 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) :is(span, a, div, p, figure):has(> img:not(.emoji)) {
+      transition: none;
+    }
+
+    /* 无动画模式：关闭遮罩/预览进入动画，减少眩晕与性能开销 */
+    :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) :is(span, a, div, p, figure):has(> img:not(.emoji)):hover::before,
+    :is(.markdown-reading-view, .markdown-preview-view) .markdown-rendered table :is(td, th) :is(span, a, div, p, figure):has(> img:not(.emoji)):hover > img:not(.emoji) {
+      animation: none;
+    }
+  }
+}
+
+/* 4. 兼容性修复：针对 Obsidian 里的特殊容器
+   - .cm-embed-block：某些嵌入块（例如引用、特殊渲染容器）里图片可能绕过 .markdown-rendered img 的规则。
+   - 这里补一条 max-width，保证与全局行为一致。 */
+.cm-embed-block img {
+  max-width: 75% !important;
+}
+
+/* 表格内嵌入块：继续按表格缩略逻辑约束，防止撑破行高 */
+.markdown-source-view.mod-cm6 .cm-content table .cm-embed-block img {
+  max-width: 120px !important;
+  max-height: 120px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}

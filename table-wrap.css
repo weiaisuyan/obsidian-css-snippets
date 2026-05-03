@@ -1,0 +1,13 @@
+/* ========== 表格强制自动换行 · 无视你现有的禁止换行规则 ========== */
+.markdown-reading-view table td,
+.markdown-reading-view table th,
+.markdown-source-view.mod-cm6 table td,
+.markdown-source-view.mod-cm6 table th {
+  white-space: normal !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+  min-width: unset !important;
+  max-width: 300px !important;
+  width: auto !important;
+}
